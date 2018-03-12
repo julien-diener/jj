@@ -1,22 +1,32 @@
 package org.jj.core
 
-import java.net.{ConnectException, Socket}
+import java.net.ConnectException
 
 object AppTest {
 
   def main(args: Array[String]): Unit = {
-    runLocal(2000, 5){
+    Thread.sleep(2000)
+    runLocal(2000, 2){
       nodes =>
         nodes.foreach {
-          node => println(s"ping: " + node.ping())
+          node =>
+            Thread.sleep(100)
+            println(s"client *** ping1: " + node.ping())
+            Thread.sleep(100)
+            println(s"client *** ping2: " + node.ping())
+        }
+        Thread.sleep(2000)
+        nodes.foreach {
+          node => println(s"bye: " + node.bye())
         }
     }
+    println(" *** END ***")
   }
 
-  def runLocal(startPort: Int, n: Int)(f: Seq[Node] => Unit): Unit = {
+  def runLocal(startPort: Int, n: Int)(f: Seq[ClientNode] => Unit): Unit = {
 
-    val fqcn = "org.jj.core.App"
-    val classpath = System.getProperty("java.class.path")//.split(File.pathSeparator)
+    val fqcn = classOf[Server].getName
+    val classpath = System.getProperty("java.class.path")
     val rt = Runtime.getRuntime
 
     val apps = new Array[Process](n)
@@ -24,7 +34,9 @@ object AppTest {
     try{
       (0 until n).foreach{ i =>
         val port = 2001 + i
-        val app = rt.exec(s"java -classpath $classpath $fqcn $port")
+        val cmd = s"java -classpath $classpath $fqcn $port"
+        println(s"running cmd '$cmd'")
+        val app = rt.exec(cmd)
         apps(i) = app
 
         val pid = if (app.getClass.getName.equals("java.lang.UNIXProcess")) {
@@ -38,17 +50,16 @@ object AppTest {
       }
 
       // connect to deployed app
-      val nodes = new Array[Node](n)
+      val nodes = new Array[ClientNode](n)
       var connected = 0
       var iter = 0
-      while(connected < n && iter < 100){
-        Thread.sleep(50)
+      while(connected < n && iter < 10){
+        Thread.sleep(200)
         (0 until n).foreach { i =>
           if(nodes(i) == null) {
             val port = 2001 + i
             try {
-              val socket = new Socket("127.0.0.1", port)
-              nodes(i) = new LocalNode(socket)
+              nodes(i) = new ClientNode("127.0.0.1", port)
               connected += 1
             } catch {
               case _: ConnectException => //println(s" *** ConnectException on port $i ***")
@@ -72,16 +83,16 @@ object AppTest {
     }
   }
 
-  def runThread(startPort: Int, n: Int)(f: Seq[Node] => Unit): Unit = {
+  def runThread(startPort: Int, n: Int)(f: Seq[ClientNode] => Unit): Unit = {
 
-    val netSrv = new Array[NetworkService](n)
+    val netSrv = new Array[Server](n)
     val threads = new Array[Thread](n)
-    val nodes = new Array[Node](n)
+    val nodes = new Array[ClientNode](n)
 
     try{
       (0 until n).foreach{ i =>
         val port = 2001 + i
-        val srv = new NetworkService(port, 1)
+        val srv = new Server(port, 5)
         netSrv(i) = srv
 
         val thread = new Thread(srv)
@@ -89,21 +100,23 @@ object AppTest {
         threads(i) = thread
 
         val tid = thread.getId
-        println(s"running thread $tid receiving on port $port")
+        println(s"client running thread $tid receiving on port $port")
 
         //Thread.sleep(100)
-        nodes(i) = new LocalNode(new Socket("127.0.0.1", port))
+        nodes(i) = new ClientNode("127.0.0.1", port)
       }
 
+      println("client call F")
       f(nodes)
+      println("client F done")
 
       Thread.sleep(2000)
 
     } finally {
       (0 until n).foreach{ i =>
-        netSrv(i).close()
-        threads(i).interrupt()
-        threads(i).stop()
+        val srv = netSrv(i)
+        if(srv != null) srv.close()
+        //threads(i).interrupt()
         threads(i) = null
       }
     }
