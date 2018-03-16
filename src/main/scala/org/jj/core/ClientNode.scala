@@ -12,10 +12,10 @@ class ClientNode(host: String, port: Int) extends SocketHelper {
 
   private val socket: Socket = new Socket(host, port)
 
-  def ping(): Boolean = send("ping") == "pong"
-  def bye(): Boolean = send("bye") == "bye"
+  def ping(): Boolean = send("ping").contains("pong")
+  def bye(): Boolean = send("bye").contains("bye")
 
-  private def send(msg: String): String = {
+  private def send(msg: String): Option[String] = {
     send(socket, msg)
     println("Client send: " + msg)
 
