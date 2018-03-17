@@ -14,7 +14,16 @@ object Server {
     redirectOutput(filename)
     println(s"App starting with port $port (out = $filename)")
 
-    new Server(port, 1).run()
+    val server = new Server(port, 1)
+
+    Runtime.getRuntime.addShutdownHook(new Thread{
+      override def run(): Unit = {
+        println("closing on shutdown signal")
+        server.close()
+      }
+    })
+
+    server.run()
   }
 
   def redirectOutput(filename: String): Unit = {
@@ -50,62 +59,64 @@ class Server(port: Int, poolSize: Int) extends Runnable with SocketHelper {
 
 
   def run() {
-    val socket = serverSocket.accept() // This will block until a connection comes in
-    connection = new ServerConnection(socket)
-    connection.listen()
+    connection = new ServerConnection(serverSocket)
+    connection.start()
     println(s"service on port=$port stopped")
   }
 
   def close(): Unit = {
-    if(connection != null) connection.close()
+    if(connection != null) connection.stop()
     connection = null
     serverSocket.close()
     println(s"close service on port=$port ${serverSocket.isClosed}")
   }
 }
 
-// connection to one client
-class ServerConnection(socket: Socket) extends SocketHelper {
+// connect to a client and repeat until connection is closed
+// then, connect to next client
+class ServerConnection(serverSocket: ServerSocket) extends SocketHelper {
+
+  private var socket: Socket = _
   private var continue = true
-  private var closeRequested: Boolean = false
 
-  def listen(): Unit = while (continue) {
-    def quit(msg: String): Unit = {
-      println(s"connection with ${socket.getRemoteSocketAddress} closed $msg")
-      continue = false
-    }
-    try{
-        // read request
-        read(socket) match {
-          case Some(request) =>
-            // respond
-            val ans = request.toLowerCase match {
-              case "bye" => quit("on client request"); "bye"
-              case "ping" => "pong"
-              case r => s"""unknown request "$r" """
-            }
+  def start(): Unit = while (continue) try {
+    if(socket == null)
+      socket = serverSocket.accept() // This will block until a connection comes in
 
-            try {
-              send(socket, ans)
-            } catch {
-              case NonFatal(t) =>
-                val stack = t.getStackTrace.mkString("\n")
-                quit(s" - unexpected error: ${t.getMessage}\n" + stack)
-            }
-
-          case None =>
-            quit("- client has stop connection abruptly")
+    // read request
+    read(socket) match {
+      case Some(request) =>
+        // respond
+        request.toLowerCase match {
+          case "ping" => reply("pong")
+          case "bye"  => reply("bye"); quit("on client request")
+          case r      => reply(s"""unknown request "$r" """)
         }
 
-    } catch {
-      case _: SocketException if closeRequested => quit("on server request")
+      case None =>
+        quit("- client has stop connection abruptly")
     }
+
+  } catch {
+    case _: SocketException if !continue => quit("on server request")
   }
 
-  def close(): Unit = {
-    continue = false
-    closeRequested = true
-    // is processing ?
-    socket.close()
+  private def quit(msg: String): Unit = {
+    println(s"connection with ${socket.getRemoteSocketAddress} closed $msg")
+    socket = null
   }
+
+  def stop(): Unit = {
+    continue = false
+    if(socket != null) socket.close()
+  }
+
+  private def reply(msg: String): Unit = try {
+    send(socket, msg)
+  } catch {
+    case NonFatal(t) =>
+      val stack = t.getStackTrace.mkString("\n")
+      quit(s" - unexpected error: ${t.getMessage}\n" + stack)
+  }
+
 }
