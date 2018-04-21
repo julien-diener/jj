@@ -1,14 +1,12 @@
-name := "jj-core"
-organization := "org.jj"
+lazy val commonSettings = Seq(
+  organization := "org.jj",
+  version := "0.1",
+  scalaVersion := "2.12.4"
+)
 
-version := "0.1"
 
-scalaVersion := "2.12.4"
+name := "jj"
 
-mainClass in Compile := Some("org.jj.core.Server")
+lazy val core = (project in file("core")).settings(commonSettings)
 
-enablePlugins(JavaAppPackaging)
-enablePlugins(DockerPlugin)
-enablePlugins(AshScriptPlugin)
-
-dockerBaseImage := "openjdk:jre-alpine"
+lazy val root = (project in file(".")).aggregate(core)
