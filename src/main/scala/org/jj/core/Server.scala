@@ -1,6 +1,6 @@
 package org.jj.core
 
-import java.io.{BufferedInputStream, File, FileOutputStream, PrintStream}
+import java.io._
 import java.net.{ServerSocket, Socket, SocketException}
 
 import scala.util.control.NonFatal
@@ -36,20 +36,41 @@ object Server {
 }
 
 trait SocketHelper{
-  protected def read(socket: Socket): Option[String] = {
+
+  type MsgType1 = () => String
+
+  protected def receivedStr(socket: Socket): Option[String] = {
+    received(socket).map(b => new String(b, 0, b.length))
+  }
+
+  protected def received(socket: Socket): Option[Array[Byte]] = {
     val reader = new BufferedInputStream(socket.getInputStream)
     val inBytes = new Array[Byte](4096)
     val inSize = reader.read(inBytes)
     if(inSize<1) None
-    else Some(new String(inBytes, 0, inSize))
+    else Some(inBytes.take(inSize))
   }
 
-  protected def send(socket: Socket, msg: String): Unit = {
+  protected def sendStr(socket: Socket, msg: String): Unit = {
     println(s"  sending msg + '$msg'")
-    val out = socket.getOutputStream
-    out.write(msg.getBytes)
-    out.flush()
+    send(socket, msg.getBytes)
     println(s"  msg sent")
+  }
+
+  protected def send(socket: Socket, bytes: Array[Byte]): Unit = {
+    val out = socket.getOutputStream
+    out.write(bytes)
+    out.flush()
+  }
+
+  protected def serialize[A](obj: A): Array[Byte] = {
+    val bo = new ByteArrayOutputStream()
+    new ObjectOutputStream(bo).writeObject(obj)
+    bo.toByteArray
+  }
+
+  protected def deserialize[A](bytes:Array[Byte]): A = {
+    new ObjectInputStream(new ByteArrayInputStream(bytes)).readObject().asInstanceOf[A]
   }
 }
 
@@ -84,13 +105,25 @@ class ServerConnection(serverSocket: ServerSocket) extends SocketHelper {
       socket = serverSocket.accept() // This will block until a connection comes in
 
     // read request
-    read(socket) match {
-      case Some(request) =>
-        // respond
-        request.toLowerCase match {
-          case "ping" => reply("pong")
-          case "bye"  => reply("bye"); quit("on client request")
-          case r      => reply(s"""unknown request "$r" """)
+    received(socket) match {
+      case Some(requestBytes) =>
+        requestBytes(0) match {
+          case 1 =>
+            val f = deserialize[MsgType1](requestBytes.tail)
+            reply("received ()=> " + f())
+
+          case 2 =>
+            val a = deserialize[AppTest](requestBytes.tail)
+            reply("received " + a.message())
+
+          case b =>
+            val headStr = b.toString
+            val request = new String(requestBytes, 0, requestBytes.length)
+            request.trim.toLowerCase match {
+              case "ping" => reply("pong "+headStr)
+              case "bye"  => reply("bye"+headStr); quit("on client request")
+              case r      => reply(s"""unknown request "$r" """+headStr)
+            }
         }
 
       case None =>
@@ -112,7 +145,7 @@ class ServerConnection(serverSocket: ServerSocket) extends SocketHelper {
   }
 
   private def reply(msg: String): Unit = try {
-    send(socket, msg)
+    sendStr(socket, msg)
   } catch {
     case NonFatal(t) =>
       val stack = t.getStackTrace.mkString("\n")

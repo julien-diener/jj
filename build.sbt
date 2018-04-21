@@ -1,4 +1,4 @@
-name := "core"
+name := "jj-core"
 organization := "org.jj"
 
 version := "0.1"

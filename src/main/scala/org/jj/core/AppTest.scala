@@ -2,9 +2,22 @@ package org.jj.core
 
 import java.net.ConnectException
 
-object AppTest {
+class AppTest(content: String) extends Serializable {
+  def message(): String = content
+}
+
+object AppTest extends SocketHelper {
 
   def main(args: Array[String]): Unit = {
+    val node = new ClientNode("127.0.0.1", 13013)
+
+    val msg = new AppTest("Hello World")
+    val response = node.sendMsg2(msg)
+
+    println(response)
+  }
+
+  def main0(args: Array[String]): Unit = {
     Thread.sleep(2000)
     runLocal(2000, 2){
       nodes =>
