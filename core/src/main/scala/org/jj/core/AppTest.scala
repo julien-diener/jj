@@ -6,20 +6,24 @@ class AppTest(content: String) extends Serializable {
   def message(): String = content
 }
 
-object OneApp extends App
-class TwoApp() extends App{
+object App1 extends App
+class App2() extends App{
   val yo = 42
 }
 
 object AppTest extends SocketHelper {
 
+  class App3() extends App
+
   def main(args: Array[String]): Unit = {
 
-    println(OneApp.jarFile())
-    println("----")
-    println(new TwoApp().jarFile().getAbsoluteFile)
-    println("----")
-    println(new App {}.jarFile())
+    class App4() extends App
+
+    println(AppUtils.getJarFile(App1.getClass))
+    println(AppUtils.getJarFile(new App2().getClass))
+    println(AppUtils.getJarFile(new App3().getClass))
+    println(AppUtils.getJarFile(new App4().getClass))
+    println(AppUtils.getJarFile(new App {}.getClass))
 
     //val node = new ClientNode("127.0.0.1", 13013)
     //
