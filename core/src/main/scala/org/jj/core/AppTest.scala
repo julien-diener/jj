@@ -6,31 +6,31 @@ class AppTest(content: String) extends Serializable {
   def message(): String = content
 }
 
-object App1 extends App
-class App2() extends App{
-  val yo = 42
-}
+object App1 extends App{ def start(port: Int): Int = 0 }
+class App2() extends App{ def start(port: Int): Int = 0 }
 
 object AppTest extends SocketHelper {
 
-  class App3() extends App
+  class App3() extends App{ def start(port: Int): Int = 0 }
 
   def main(args: Array[String]): Unit = {
 
-    class App4() extends App
+    class App4() extends App{ def start(port: Int): Int = 0 }
+    val app5 = new App{ def start(port: Int): Int = 0 }
 
     println(AppUtils.getJarFile(App1.getClass))
     println(AppUtils.getJarFile(new App2().getClass))
     println(AppUtils.getJarFile(new App3().getClass))
     println(AppUtils.getJarFile(new App4().getClass))
-    println(AppUtils.getJarFile(new App {}.getClass))
+    println(AppUtils.getJarFile(app5.getClass))
 
-    //val node = new ClientNode("127.0.0.1", 13013)
-    //
-    //val msg = new AppTest("Hello World")
-    //val response = node.sendMsg2(msg)
-    //
-    //println(response)
+    val node = new ClientNode("127.0.0.1", 13013)
+    println("ping: " + node.ping())
+
+    val msg = new AppTest("Hello World")
+    val response = node.sendMsg2(msg)
+
+    println(response)
   }
 
   def main0(args: Array[String]): Unit = {
@@ -121,7 +121,7 @@ object AppTest extends SocketHelper {
     try{
       (0 until n).foreach{ i =>
         val port = 2001 + i
-        val srv = new Server(port, 5)
+        val srv = new MainServer(port, 5)
         netSrv(i) = srv
 
         val thread = new Thread(srv)
@@ -144,7 +144,7 @@ object AppTest extends SocketHelper {
     } finally {
       (0 until n).foreach{ i =>
         val srv = netSrv(i)
-        if(srv != null) srv.close()
+        if(srv != null) srv.stop()
         //threads(i).interrupt()
         threads(i) = null
       }

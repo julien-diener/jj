@@ -8,10 +8,19 @@ import scala.util.{Failure, Success, Try}
 /** to be executed by Server */
 trait App {
 
+  def start(port: Int): Int
+  def stop(): Int = 0
 
 }
 
+object AppLauncher{
+  def main(args: Array[String]): Unit = {
+
+  }
+}
+
 object AppUtils {
+
   /** return path to this class jar file
     *
     * If this class file is not in a jar, make the jar

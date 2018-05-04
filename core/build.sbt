@@ -1,7 +1,7 @@
 name := "jj-core"
 
 
-mainClass in Compile := Some("org.jj.core.Server")
+mainClass in Compile := Some("org.jj.core.MainServer")
 
 enablePlugins(JavaAppPackaging)
 enablePlugins(DockerPlugin)
